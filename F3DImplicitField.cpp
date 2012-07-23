@@ -167,6 +167,7 @@ class F3DImplicitField : public ImplicitField
         Field<V3f>::Ptr m_vel_fbuffer;
         Field<V3d>::Ptr m_vel_dbuffer;
         Field<V3h>::Ptr m_vel_hbuffer;
+        bool m_vector_field;
         // velocity mappings
         FieldMapping *m_vel_mapping;
         // scalar mappings
@@ -272,6 +273,7 @@ F3DImplicitField::F3DImplicitField(string path, float blur, float bbox_mod) :
     } 
    
     // Velocity Field(s)
+    m_vector_field = false;
     vector<string> velFieldNames;
     vector<string> velFieldAttribs;
     vector<string> scalarLayers;
@@ -287,6 +289,7 @@ F3DImplicitField::F3DImplicitField(string path, float blur, float bbox_mod) :
         sFields = m_in.readScalarLayers<float>(velpartition, velattrib);
 
         if (vFields.size() > 0) {
+            m_vector_field = true;
             m_vel_fbuffer = SetupVectorVelocityFields<float>(velFieldNames,
                                                              velFieldAttribs,
                                                              scalarLayers,
@@ -309,6 +312,7 @@ F3DImplicitField::F3DImplicitField(string path, float blur, float bbox_mod) :
         sFields = m_in.readScalarLayers<double>(velpartition, velattrib);
 
         if (vFields.size() > 0) {
+            m_vector_field = true;
             m_vel_dbuffer = SetupVectorVelocityFields<double>(velFieldNames,
                                                               velFieldAttribs,
                                                               scalarLayers,
@@ -331,6 +335,7 @@ F3DImplicitField::F3DImplicitField(string path, float blur, float bbox_mod) :
         sFields = m_in.readScalarLayers<half>(velpartition, velattrib);
 
         if (vFields.size() > 0) {
+            m_vector_field = true;
             m_vel_hbuffer = SetupVectorVelocityFields<half>(velFieldNames,
                                                             velFieldAttribs,
                                                             scalarLayers,
@@ -353,79 +358,86 @@ F3DImplicitField::F3DImplicitField(string path, float blur, float bbox_mod) :
 void F3DImplicitField::Motion(RtPoint result, const RtPoint p)
 {
     V3d wsP(p[0], p[1], p[2]);
-    V3d vsP;
+    V3d vsP, vsPx, vsPy, vsPz;
+    V3f ret;
 
     const string   velpartition = "vel";
     const string   velattrib = "x";
 
-    m_vel_mapping->worldToVoxel(wsP, vsP);
-    V3d worldPt = xformPoint(vsP, m_mapping, 0, 0);
+    //V3d worldPt = xformPoint(vsP, m_mapping, 0, 0);
+    if (m_vector_field) {
+        m_vel_mapping->worldToVoxel(wsP, vsP);
+    } else {
+        m_velx_mapping->worldToVoxel(wsP, vsPx);
+        m_vely_mapping->worldToVoxel(wsP, vsPy);
+        m_velz_mapping->worldToVoxel(wsP, vsPz);
+    }
 
     if (m_dataType == "float") {
 
         V3f v_samps;
-        Field<V3f>::Vec vFields;
-        Field<float>::Vec sFields;
 
-        vFields = m_in.readVectorLayers<float>(velpartition, velpartition);
-        sFields = m_in.readScalarLayers<float>(velpartition, velattrib);
+        if (m_vector_field) {
 
+            msgs->Info("float vector field");
 
-        if (vFields.size() > 0) {
+            v_samps = m_f3interpolator.sample(*m_vel_fbuffer, vsP);
 
-                v_samps = m_f3interpolator.sample(*m_vel_fbuffer, vsP);
+        } else {
 
-        } else if (sFields.size() > 0) {
+            msgs->Info("float scalar field");
 
-                v_samps.x = m_finterpolator.sample(*m_velx_fbuffer, vsP);
-                v_samps.y = m_finterpolator.sample(*m_vely_fbuffer, vsP);
-                v_samps.z = m_finterpolator.sample(*m_velz_fbuffer, vsP);
+            v_samps.x = m_finterpolator.sample(*m_velx_fbuffer, vsPx);
+            v_samps.y = m_finterpolator.sample(*m_vely_fbuffer, vsPy);
+            v_samps.z = m_finterpolator.sample(*m_velz_fbuffer, vsPz);
         }
+
+        ret.x = v_samps.x;
+        ret.y = v_samps.y;
+        ret.z = v_samps.z;
+
     } else if (m_dataType == "double") {
 
         V3d v_samps;
-        Field<V3d>::Vec vFields;
-        Field<double>::Vec sFields;
 
-        vFields = m_in.readVectorLayers<double>(velpartition, velpartition);
-        sFields = m_in.readScalarLayers<double>(velpartition, velattrib);
+        if (m_vector_field) {
 
+            v_samps = m_d3interpolator.sample(*m_vel_dbuffer, vsP);
 
-        if (vFields.size() > 0) {
+        } else {
 
-                v_samps = m_d3interpolator.sample(*m_vel_dbuffer, vsP);
-
-        } else if (sFields.size() > 0) {
-
-                v_samps.x = m_dinterpolator.sample(*m_velx_dbuffer, vsP);
-                v_samps.y = m_dinterpolator.sample(*m_vely_dbuffer, vsP);
-                v_samps.z = m_dinterpolator.sample(*m_velz_dbuffer, vsP);
+            v_samps.x = m_dinterpolator.sample(*m_velx_dbuffer, vsPx);
+            v_samps.y = m_dinterpolator.sample(*m_vely_dbuffer, vsPy);
+            v_samps.z = m_dinterpolator.sample(*m_velz_dbuffer, vsPz);
         }
+
+        ret.x = static_cast<float>(v_samps.x);
+        ret.y = static_cast<float>(v_samps.y);
+        ret.z = static_cast<float>(v_samps.z);
+
     } else if (m_dataType == "half") {
 
         V3h v_samps;
-        Field<V3h>::Vec vFields;
-        Field<half>::Vec sFields;
 
-        vFields = m_in.readVectorLayers<half>(velpartition, velpartition);
-        sFields = m_in.readScalarLayers<half>(velpartition, velattrib);
+        if (m_vector_field) {
 
+            v_samps = m_h3interpolator.sample(*m_vel_hbuffer, vsP);
 
-        if (vFields.size() > 0) {
+        } else {
 
-                v_samps = m_h3interpolator.sample(*m_vel_hbuffer, vsP);
-
-        } else if (sFields.size() > 0) {
-
-                v_samps.x = m_hinterpolator.sample(*m_velx_hbuffer, vsP);
-                v_samps.y = m_hinterpolator.sample(*m_vely_hbuffer, vsP);
-                v_samps.z = m_hinterpolator.sample(*m_velz_hbuffer, vsP);
+            v_samps.x = m_hinterpolator.sample(*m_velx_hbuffer, vsPx);
+            v_samps.y = m_hinterpolator.sample(*m_vely_hbuffer, vsPy);
+            v_samps.z = m_hinterpolator.sample(*m_velz_hbuffer, vsPz);
         }
+
+        ret.x = static_cast<float>(v_samps.x);
+        ret.y = static_cast<float>(v_samps.y);
+        ret.z = static_cast<float>(v_samps.z);
     }
 
-    result[0] = v_samps.x * m_blur;
-    result[1] = v_samps.y * m_blur;
-    result[2] = v_samps.z * m_blur;
+    result[0] = ret.x * m_blur;
+    result[1] = ret.y * m_blur;
+    result[2] = ret.z * m_blur;
 }
 
 void F3DImplicitField::BoxMotion(RtBound result, const RtBound b)
@@ -433,7 +445,7 @@ void F3DImplicitField::BoxMotion(RtBound result, const RtBound b)
     // Take the difference between our original bbox and motion blurred bbox
     V3d diffmax(m_vel_xmax - bbox[1], m_vel_ymax - bbox[3], m_vel_zmax - bbox[5]);
     V3d diffmin(m_vel_xmin - bbox[0], m_vel_ymin - bbox[2], m_vel_zmin - bbox[4]);
-    msgs->Info("Motion bounds(%f %f %f %f %f %f)", diffmin.x, diffmax.x, diffmin.y, diffmax.y, diffmin.z, diffmax.z);
+    //msgs->Info("Motion bounds(%f %f %f %f %f %f)", diffmin.x, diffmax.x, diffmin.y, diffmax.y, diffmin.z, diffmax.z);
 
     result[0] = b[0] + (diffmin.x * m_bbox_mod);
     result[1] = b[1] + (diffmax.x * m_bbox_mod);
@@ -441,7 +453,7 @@ void F3DImplicitField::BoxMotion(RtBound result, const RtBound b)
     result[3] = b[3] + (diffmax.y * m_bbox_mod);
     result[4] = b[4] + (diffmin.z * m_bbox_mod);
     result[5] = b[5] + (diffmax.z * m_bbox_mod);
-    //msgs->Info("Motion bounds(%f %f %f %f %f %f)", result[0], result[1], result[2], result[3], result[4], result[5]);
+    msgs->Info("Motion bounds(%f %f %f %f %f %f)", result[0], result[1], result[2], result[3], result[4], result[5]);
 }
 
 void F3DImplicitField::MotionMultiple(int neval, RtPoint *result, const RtPoint *p) 
