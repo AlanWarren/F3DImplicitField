@@ -367,12 +367,15 @@ void F3DImplicitField::Motion(RtPoint result, const RtPoint p)
 
 void F3DImplicitField::BoxMotion(RtBound result, const RtBound b)
 {
-    result[0] = b[0] - (m_vel_xmin * m_bbox_mod);
-    result[1] = b[1] + (m_vel_xmax * m_bbox_mod);
-    result[2] = b[2] - (m_vel_ymin * m_bbox_mod);
-    result[3] = b[3] + (m_vel_ymax * m_bbox_mod);
-    result[4] = b[4] - (m_vel_zmin * m_bbox_mod);
-    result[5] = b[5] + (m_vel_zmax * m_bbox_mod);
+    V3d diffmax(m_vel_xmax - bbox[1], m_vel_ymax - bbox[3], m_vel_zmax - bbox[5]);
+    V3d diffmin(m_vel_xmin - bbox[0], m_vel_ymin - bbox[2], m_vel_zmin - bbox[4]);
+
+    result[0] = b[0] + (diffmin.x * m_bbox_mod);
+    result[1] = b[1] + (diffmax.x * m_bbox_mod);
+    result[2] = b[2] + (diffmin.y * m_bbox_mod);
+    result[3] = b[3] + (diffmax.y * m_bbox_mod);
+    result[4] = b[4] + (diffmin.z * m_bbox_mod);
+    result[5] = b[5] + (diffmax.z * m_bbox_mod);
     msgs->Info("Motion bounds(%f %f %f %f %f %f)", result[0], result[1], result[2], result[3], result[4], result[5]);
 }
 
