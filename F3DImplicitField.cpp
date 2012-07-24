@@ -364,28 +364,32 @@ void F3DImplicitField::Motion(RtPoint result, const RtPoint p)
     const string   velpartition = "vel";
     const string   velattrib = "x";
 
-    //V3d worldPt = xformPoint(vsP, m_mapping, 0, 0);
+    // Handle the different mappings 
     if (m_vector_field) {
-        m_vel_mapping->worldToVoxel(wsP, vsP);
+
+        //m_vel_mapping->worldToVoxel(wsP, vsP);
+        vsP = xformPoint(wsP, m_vel_mapping, 1, 0);
+
     } else {
-        m_velx_mapping->worldToVoxel(wsP, vsPx);
-        m_vely_mapping->worldToVoxel(wsP, vsPy);
-        m_velz_mapping->worldToVoxel(wsP, vsPz);
+
+        //m_velx_mapping->worldToVoxel(wsP, vsPx);
+        //m_vely_mapping->worldToVoxel(wsP, vsPy);
+        //m_velz_mapping->worldToVoxel(wsP, vsPz);
+        vsPx = xformPoint(wsP, m_velx_mapping, 1, 0);
+        vsPy = xformPoint(wsP, m_vely_mapping, 1, 0);
+        vsPz = xformPoint(wsP, m_velz_mapping, 1, 0);
     }
 
+    // Sample velocity field(s)
     if (m_dataType == "float") {
 
         V3f v_samps;
 
         if (m_vector_field) {
 
-            msgs->Info("float vector field");
-
             v_samps = m_f3interpolator.sample(*m_vel_fbuffer, vsP);
 
         } else {
-
-            msgs->Info("float scalar field");
 
             v_samps.x = m_finterpolator.sample(*m_velx_fbuffer, vsPx);
             v_samps.y = m_finterpolator.sample(*m_vely_fbuffer, vsPy);
@@ -443,17 +447,22 @@ void F3DImplicitField::Motion(RtPoint result, const RtPoint p)
 void F3DImplicitField::BoxMotion(RtBound result, const RtBound b)
 {
     // Take the difference between our original bbox and motion blurred bbox
+    V3f minlen(m_vel_xmin, m_vel_ymin, m_vel_zmin);
+    V3f maxlen(m_vel_xmax, m_vel_ymax, m_vel_zmax);
+    float minlenf = minlen.length();
+    float maxlenf = maxlen.length();
+
     V3d diffmax(m_vel_xmax - bbox[1], m_vel_ymax - bbox[3], m_vel_zmax - bbox[5]);
     V3d diffmin(m_vel_xmin - bbox[0], m_vel_ymin - bbox[2], m_vel_zmin - bbox[4]);
-    //msgs->Info("Motion bounds(%f %f %f %f %f %f)", diffmin.x, diffmax.x, diffmin.y, diffmax.y, diffmin.z, diffmax.z);
 
-    result[0] = b[0] + (diffmin.x * m_bbox_mod);
+    result[0] = b[0] - (diffmin.x * m_bbox_mod);
     result[1] = b[1] + (diffmax.x * m_bbox_mod);
-    result[2] = b[2] + (diffmin.y * m_bbox_mod);
+    result[2] = b[2] - (diffmin.y * m_bbox_mod);
     result[3] = b[3] + (diffmax.y * m_bbox_mod);
-    result[4] = b[4] + (diffmin.z * m_bbox_mod);
+    result[4] = b[4] - (diffmin.z * m_bbox_mod);
     result[5] = b[5] + (diffmax.z * m_bbox_mod);
-    msgs->Info("Motion bounds(%f %f %f %f %f %f)", result[0], result[1], result[2], result[3], result[4], result[5]);
+
+    msgs->Info("Motion bounds result(%f %f %f %f %f %f)", result[0], result[1], result[2], result[3], result[4], result[5]);
 }
 
 void F3DImplicitField::MotionMultiple(int neval, RtPoint *result, const RtPoint *p) 
@@ -652,16 +661,17 @@ F3DImplicitField::SetupVectorVelocityFields(vector<string> &velFieldNames,
     // iterate voxels and store velocity data from cache
     for(iZ = 0; iZ < xvx.z; iZ++)
     {
-      for (iY = 0; iY < xvx.y; iY++)
-      {
-          for (iX = 0; iX < xvx.x; iX++)
-          {
-              // sample the values
-              bufVel = buffer->value(iX, iY, iZ);
-              velocities.push_back(bufVel);
-          }
-      }
+        for (iY = 0; iY < xvx.y; iY++)
+        {
+            for (iX = 0; iX < xvx.x; iX++)
+            {
+                // sample the values
+                bufVel = buffer->value(iX, iY, iZ);
+                velocities.push_back(bufVel);
+            }
+        }
     }
+
     // loop over V3f and store x y z in separate vectors
     typename vector<FIELD3D_VEC3_T<T> >::const_iterator vit = velocities.begin();
     for (; vit != velocities.end(); ++vit) 
@@ -873,4 +883,8 @@ FIELDCREATE
 	else
 		return 0;
 }
+
+
+
+
 
