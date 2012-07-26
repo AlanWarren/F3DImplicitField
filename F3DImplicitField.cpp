@@ -62,7 +62,7 @@ class VertexField : public ImplicitVertexValue
 
 };
 
-// constructor initializes data necessary to query any named field data
+// constructor initializes data necessary to query any named field (fuel, heat, temperature, etc.)
 template <class T>
 VertexField<T>::VertexField(Field3DInputFile &file, FieldMapping *mapping, LinearFieldInterp<T> interp,
         vector<string> &partitionsVec, M44d oTw, const string &fieldName) : 
@@ -84,13 +84,12 @@ RtFloat VertexField<T>::EvalField(const RtPoint p)
 
     t_mapping->worldToVoxel(wsP, vsP);
     return t_interpolator.sample(*t_buffer, vsP);
-
 }
 
 class F3DImplicitField : public ImplicitField
 {
     public:
-    	F3DImplicitField(string path, float blur, float bbox_mod);
+    	F3DImplicitField(string path, float blur, float bbox_mod, float blur_cubic, float field_cubic);
     	~F3DImplicitField(){}
     
     	virtual RtFloat Eval(const RtPoint p);
@@ -116,10 +115,11 @@ class F3DImplicitField : public ImplicitField
         template <typename T>
         vector<typename Field<T>::Ptr> SetupScalarVelocityFields(vector<string> &velFieldN, 
                                                                  vector<string> &velAttrib, 
+                                                                 vector<string> &partVec,
                                                                  vector<string> &sLayers);
 
         template <typename T>
-        VertexField<T>* DeployField(const RtToken &pname, int &nvalue);
+        VertexField<T>* NamedVertexField(const RtToken &pname, int &nvalue);
 
     private:
         vector<string> m_partitions;
@@ -134,6 +134,8 @@ class F3DImplicitField : public ImplicitField
         // argv
         float m_blur; 
         float m_bbox_mod;
+        float m_blur_cubic;
+        float m_field_cubic;
         // space transformation matrix
         M44d Mp;
         // message display
@@ -141,12 +143,12 @@ class F3DImplicitField : public ImplicitField
         // field3d
         Field3DInputFile m_in;
         FieldMapping *m_mapping;
-        LinearFieldInterp<V3f> m_f3interpolator;
-        LinearFieldInterp<V3d> m_d3interpolator;
-        LinearFieldInterp<V3h> m_h3interpolator;
         LinearFieldInterp<float> m_finterpolator;
         LinearFieldInterp<double> m_dinterpolator;
         LinearFieldInterp<half> m_hinterpolator;
+        CubicFieldInterp<float> m_cubicfinterpolator;
+        CubicFieldInterp<double> m_cubicdinterpolator;
+        CubicFieldInterp<half> m_cubichinterpolator;
         // density buffers
         Field<float>::Ptr m_fbuffer;
         Field<double>::Ptr m_dbuffer;
@@ -180,8 +182,8 @@ class F3DImplicitField : public ImplicitField
         double m_vel_length;
 };
 
-F3DImplicitField::F3DImplicitField(string path, float blur, float bbox_mod) : 
-    m_blur(blur), m_bbox_mod(bbox_mod)
+F3DImplicitField::F3DImplicitField(string path, float blur, float bbox_mod, float blur_cubic, float field_cubic) : 
+    m_blur(blur), m_bbox_mod(bbox_mod), m_blur_cubic(blur_cubic), m_field_cubic(field_cubic)
 {
 	RixContext *rixCtx = RxGetRixContext();
 	msgs = (RixMessages*)rixCtx->GetRixInterface(k_RixMessages);
@@ -277,6 +279,7 @@ F3DImplicitField::F3DImplicitField(string path, float blur, float bbox_mod) :
     vector<string> velFieldNames;
     vector<string> velFieldAttribs;
     vector<string> scalarLayers;
+    vector<string> partVec;
     const string   velpartition = "vel";
     const string   velattrib = "x";
 
@@ -298,6 +301,7 @@ F3DImplicitField::F3DImplicitField(string path, float blur, float bbox_mod) :
             vector<Field<float>::Ptr> vecbuf;
             vecbuf = SetupScalarVelocityFields<float>(velFieldNames, 
                                                       velFieldAttribs, 
+                                                      partVec,
                                                       scalarLayers);
             m_velx_fbuffer = vecbuf[0];
             m_vely_fbuffer = vecbuf[1];
@@ -321,6 +325,7 @@ F3DImplicitField::F3DImplicitField(string path, float blur, float bbox_mod) :
             vector<Field<double>::Ptr> vecbuf;
             vecbuf = SetupScalarVelocityFields<double>(velFieldNames, 
                                                        velFieldAttribs, 
+                                                       partVec,
                                                        scalarLayers);
             m_velx_dbuffer = vecbuf[0];
             m_vely_dbuffer = vecbuf[1];
@@ -344,6 +349,7 @@ F3DImplicitField::F3DImplicitField(string path, float blur, float bbox_mod) :
             vector<Field<half>::Ptr> vecbuf;
             vecbuf = SetupScalarVelocityFields<half>(velFieldNames, 
                                                      velFieldAttribs, 
+                                                     partVec,
                                                      scalarLayers);
             m_velx_hbuffer = vecbuf[0];
             m_vely_hbuffer = vecbuf[1];
@@ -351,49 +357,57 @@ F3DImplicitField::F3DImplicitField(string path, float blur, float bbox_mod) :
         }
     }
     // bounds
-	msgs->Info("Creating Volume with bbox: %f %f %f %f %f %f\n", 
+	msgs->Info("Bounding Box: %f %f %f %f %f %f\n", 
 				bbox[0], bbox[1], bbox[2], bbox[3], bbox[4], bbox[5]);
 }
 
 void F3DImplicitField::Motion(RtPoint result, const RtPoint p)
 {
     V3d wsP(p[0], p[1], p[2]);
+    //RtPoint mp[1] = {.0f, .0f, .0f};
+    //RxTransformPoints("object", "world", 1 p, 0.0f);
     V3d vsP, vsPx, vsPy, vsPz;
     V3f ret;
 
     const string   velpartition = "vel";
     const string   velattrib = "x";
 
-    // Handle the different mappings 
+    // Define mappings 
     if (m_vector_field) {
 
-        //m_vel_mapping->worldToVoxel(wsP, vsP);
-        vsP = xformPoint(wsP, m_vel_mapping, 1, 0);
+        m_vel_mapping->worldToVoxel(wsP, vsP);
 
     } else {
-
-        //m_velx_mapping->worldToVoxel(wsP, vsPx);
-        //m_vely_mapping->worldToVoxel(wsP, vsPy);
-        //m_velz_mapping->worldToVoxel(wsP, vsPz);
-        vsPx = xformPoint(wsP, m_velx_mapping, 1, 0);
-        vsPy = xformPoint(wsP, m_vely_mapping, 1, 0);
-        vsPz = xformPoint(wsP, m_velz_mapping, 1, 0);
+        m_velx_mapping->worldToVoxel(wsP, vsPx);
+        m_vely_mapping->worldToVoxel(wsP, vsPy);
+        m_velz_mapping->worldToVoxel(wsP, vsPz);
     }
 
     // Sample velocity field(s)
     if (m_dataType == "float") {
+        LinearFieldInterp<V3f> f3_linearinterpolator;
+        CubicFieldInterp<V3f> f3_cubicinterpolator;
 
         V3f v_samps;
 
         if (m_vector_field) {
-
-            v_samps = m_f3interpolator.sample(*m_vel_fbuffer, vsP);
+            // cubic or linear interpolation
+            if (m_blur_cubic != 0) {
+                v_samps = f3_cubicinterpolator.sample(*m_vel_fbuffer, vsP);
+            } else {
+                v_samps = f3_linearinterpolator.sample(*m_vel_fbuffer, vsP);
+            }
 
         } else {
-
-            v_samps.x = m_finterpolator.sample(*m_velx_fbuffer, vsPx);
-            v_samps.y = m_finterpolator.sample(*m_vely_fbuffer, vsPy);
-            v_samps.z = m_finterpolator.sample(*m_velz_fbuffer, vsPz);
+            if (m_blur_cubic != 0) {
+                v_samps.x = m_cubicfinterpolator.sample(*m_velx_fbuffer, vsPx);
+                v_samps.y = m_cubicfinterpolator.sample(*m_vely_fbuffer, vsPy);
+                v_samps.z = m_cubicfinterpolator.sample(*m_velz_fbuffer, vsPz);
+            } else {
+                v_samps.x = m_finterpolator.sample(*m_velx_fbuffer, vsPx);
+                v_samps.y = m_finterpolator.sample(*m_vely_fbuffer, vsPy);
+                v_samps.z = m_finterpolator.sample(*m_velz_fbuffer, vsPz);
+            }
         }
 
         ret.x = v_samps.x;
@@ -401,18 +415,30 @@ void F3DImplicitField::Motion(RtPoint result, const RtPoint p)
         ret.z = v_samps.z;
 
     } else if (m_dataType == "double") {
+        LinearFieldInterp<V3d> d3_linearinterpolator;
+        CubicFieldInterp<V3d> d3_cubicinterpolator;
 
         V3d v_samps;
 
         if (m_vector_field) {
 
-            v_samps = m_d3interpolator.sample(*m_vel_dbuffer, vsP);
+            if (m_blur_cubic != 0) {
+                v_samps = d3_cubicinterpolator.sample(*m_vel_dbuffer, vsP);
+            } else {
+                v_samps = d3_linearinterpolator.sample(*m_vel_dbuffer, vsP);
+            }
 
         } else {
 
-            v_samps.x = m_dinterpolator.sample(*m_velx_dbuffer, vsPx);
-            v_samps.y = m_dinterpolator.sample(*m_vely_dbuffer, vsPy);
-            v_samps.z = m_dinterpolator.sample(*m_velz_dbuffer, vsPz);
+            if (m_blur_cubic != 0) {
+                v_samps.x = m_cubicdinterpolator.sample(*m_velx_dbuffer, vsPx);
+                v_samps.y = m_cubicdinterpolator.sample(*m_vely_dbuffer, vsPy);
+                v_samps.z = m_cubicdinterpolator.sample(*m_velz_dbuffer, vsPz);
+            } else {
+                v_samps.x = m_dinterpolator.sample(*m_velx_dbuffer, vsPx);
+                v_samps.y = m_dinterpolator.sample(*m_vely_dbuffer, vsPy);
+                v_samps.z = m_dinterpolator.sample(*m_velz_dbuffer, vsPz);
+            }
         }
 
         ret.x = static_cast<float>(v_samps.x);
@@ -420,18 +446,30 @@ void F3DImplicitField::Motion(RtPoint result, const RtPoint p)
         ret.z = static_cast<float>(v_samps.z);
 
     } else if (m_dataType == "half") {
+        LinearFieldInterp<V3h> h3_linearinterpolator;
+        CubicFieldInterp<V3h> h3_cubicinterpolator;
 
         V3h v_samps;
 
         if (m_vector_field) {
 
-            v_samps = m_h3interpolator.sample(*m_vel_hbuffer, vsP);
+            if (m_blur_cubic != 0) {
+                v_samps = h3_cubicinterpolator.sample(*m_vel_hbuffer, vsP);
+            } else {
+                v_samps = h3_linearinterpolator.sample(*m_vel_hbuffer, vsP);
+            }
 
         } else {
 
-            v_samps.x = m_hinterpolator.sample(*m_velx_hbuffer, vsPx);
-            v_samps.y = m_hinterpolator.sample(*m_vely_hbuffer, vsPy);
-            v_samps.z = m_hinterpolator.sample(*m_velz_hbuffer, vsPz);
+            if (m_blur_cubic != 0) {
+                v_samps.x = m_cubichinterpolator.sample(*m_velx_hbuffer, vsPx);
+                v_samps.y = m_cubichinterpolator.sample(*m_vely_hbuffer, vsPy);
+                v_samps.z = m_cubichinterpolator.sample(*m_velz_hbuffer, vsPz);
+            } else {
+                v_samps.x = m_hinterpolator.sample(*m_velx_hbuffer, vsPx);
+                v_samps.y = m_hinterpolator.sample(*m_vely_hbuffer, vsPy);
+                v_samps.z = m_hinterpolator.sample(*m_velz_hbuffer, vsPz);
+            }
         }
 
         ret.x = static_cast<float>(v_samps.x);
@@ -455,14 +493,15 @@ void F3DImplicitField::BoxMotion(RtBound result, const RtBound b)
     V3d diffmax(m_vel_xmax - bbox[1], m_vel_ymax - bbox[3], m_vel_zmax - bbox[5]);
     V3d diffmin(m_vel_xmin - bbox[0], m_vel_ymin - bbox[2], m_vel_zmin - bbox[4]);
 
-    result[0] = b[0] - (diffmin.x * m_bbox_mod);
-    result[1] = b[1] + (diffmax.x * m_bbox_mod);
-    result[2] = b[2] - (diffmin.y * m_bbox_mod);
-    result[3] = b[3] + (diffmax.y * m_bbox_mod);
-    result[4] = b[4] - (diffmin.z * m_bbox_mod);
-    result[5] = b[5] + (diffmax.z * m_bbox_mod);
-
-    msgs->Info("Motion bounds result(%f %f %f %f %f %f)", result[0], result[1], result[2], result[3], result[4], result[5]);
+    // Offset by length seems to work the best..
+    result[0] = b[0] + (maxlenf * m_bbox_mod);
+    result[1] = b[1] + (maxlenf * m_bbox_mod);
+    result[2] = b[2] + (maxlenf * m_bbox_mod);
+    result[3] = b[3] + (maxlenf * m_bbox_mod);
+    result[4] = b[4] + (maxlenf * m_bbox_mod);
+    result[5] = b[5] + (maxlenf * m_bbox_mod);
+    
+    msgs->Info("Motion Bounds (%f %f %f %f %f %f)", result[0], result[1], result[2], result[3], result[4], result[5]);
 }
 
 void F3DImplicitField::MotionMultiple(int neval, RtPoint *result, const RtPoint *p) 
@@ -475,38 +514,43 @@ void F3DImplicitField::MotionMultiple(int neval, RtPoint *result, const RtPoint 
 ImplicitVertexValue *F3DImplicitField::CreateVertexValue(const RtToken pname, int nvalue)
 {
     if (m_dataType == "float") {
-        return DeployField<float>(pname, nvalue);
+        return NamedVertexField<float>(pname, nvalue);
     } 
     else if (m_dataType == "double") {
-        return DeployField<double>(pname, nvalue);
+        return NamedVertexField<double>(pname, nvalue);
     }
     else if (m_dataType == "half") {
-        return DeployField<half>(pname, nvalue);
+        return NamedVertexField<half>(pname, nvalue);
     }
 }
 
+// Returns fields both defined in RIB, and present in the cache (besides vel & density)
 template <typename T>
-VertexField<T>* F3DImplicitField::DeployField(const RtToken &pname, int &nvalue)
+VertexField<T>* F3DImplicitField::NamedVertexField(const RtToken &pname, int &nvalue)
 {
     string flt = "float ";
     string cmp, nm;
     LinearFieldInterp<T> interp;
-
+    // iterate through all fields present in cache
     vector<string>::const_iterator vit = m_vertexfields.begin();
     for (; vit != m_vertexfields.end(); ++vit)
     {
         if (*vit != "vel" && *vit != "density")
         { 
+            // &pname contains "float fieldname", so I compose a string to compare
             cmp = flt + *vit;
             nm = *vit;
+            // If the field is scalar AND present in our RIB declaration
             if (nvalue == 1 && !strcmp(pname, cmp.c_str())) {
                 return new VertexField<T>(m_in, m_mapping, interp, m_partitions, Mp, nm);
             } 
+            // TODO: Add support for vector VertexField<T>*
         }
     }
     return NULL;
 }
 
+// Setup extents and bounds
 template <typename T>
 void F3DImplicitField::ReadLayersAndSetupFields(typename Field<T>::Vec sFields)
 {
@@ -554,13 +598,31 @@ RtFloat F3DImplicitField::Eval(const RtPoint p)
     m_mapping->worldToVoxel(wsP, vsP);
 
     if (m_dataType == "float") {
-        ret = m_finterpolator.sample(*m_fbuffer, vsP);
+
+        if (m_field_cubic != 0) {
+            ret = m_cubicfinterpolator.sample(*m_fbuffer, vsP);
+        } else {
+            ret = m_finterpolator.sample(*m_fbuffer, vsP);
+        }
+
     }
     else if (m_dataType == "double") {
-        ret = (float)m_dinterpolator.sample(*m_dbuffer, vsP);
+
+        if (m_field_cubic != 0) {
+            ret = (float)m_cubicdinterpolator.sample(*m_dbuffer, vsP);
+        } else {
+            ret = (float)m_dinterpolator.sample(*m_dbuffer, vsP);
+        }
+
     }
     else if (m_dataType == "half") {
-        ret = (float)m_hinterpolator.sample(*m_hbuffer, vsP);
+
+        if (m_field_cubic != 0) {
+            ret = (float)m_cubichinterpolator.sample(*m_hbuffer, vsP);
+        } else {
+            ret = (float)m_hinterpolator.sample(*m_hbuffer, vsP);
+        }
+
     }
 
     return ret;
@@ -702,6 +764,7 @@ template <typename T>
 vector<typename Field<T>::Ptr> 
 F3DImplicitField::SetupScalarVelocityFields(vector<string> &velFieldN, 
                                             vector<string> &velAttrib, 
+                                            vector<string> &partVec,
                                             vector<string> &sLayers)
 {
     vector<typename Field<T>::Ptr> vecbuf;
@@ -712,9 +775,9 @@ F3DImplicitField::SetupScalarVelocityFields(vector<string> &velFieldN,
     const string attribute_z = "z";
     
     // velocity xyz buffers
-    typename Field<T>::Ptr vx = getField<T>(m_in, m_partitions, velFieldN, velAttrib, sLayers, attribute_x, name);
-    typename Field<T>::Ptr vy = getField<T>(m_in, m_partitions, velFieldN, velAttrib, sLayers, attribute_y, name);
-    typename Field<T>::Ptr vz = getField<T>(m_in, m_partitions, velFieldN, velAttrib, sLayers, attribute_z, name);
+    typename Field<T>::Ptr vx = getField<T>(m_in, partVec, velFieldN, velAttrib, sLayers, attribute_x, name);
+    typename Field<T>::Ptr vy = getField<T>(m_in, partVec, velFieldN, velAttrib, sLayers, attribute_y, name);
+    typename Field<T>::Ptr vz = getField<T>(m_in, partVec, velFieldN, velAttrib, sLayers, attribute_z, name);
     // store buffers for return
     vecbuf.push_back(vx); vecbuf.push_back(vy); vecbuf.push_back(vz);
 
@@ -723,28 +786,34 @@ F3DImplicitField::SetupScalarVelocityFields(vector<string> &velFieldN,
     m_velz_mapping = vz->mapping().get();
 
     size_t iX, iY, iZ;
+    size_t jX, jY, jZ;
+    size_t kX, kY, kZ;
     T velx, vely, velz;
     vector<T> velocitiesx;
     vector<T> velocitiesy;
     vector<T> velocitiesz;
+    Box3i xExt, yExt, zExt;
+    xExt = vx->extents(); yExt = vy->extents(); zExt = vz->extents();
+    const V3i xMaxres = xExt.max;
+    const V3i yMaxres = yExt.max;
+    const V3i zMaxres = zExt.max;
 
-    // XXX: get more accurate extents
-    for(iZ = 0; iZ < m_zmax; iZ++)
+    for(iZ = 0; iZ < xMaxres.z; iZ++)
     {
-      for (iY = 0; iY < m_ymax; iY++)
-      {
-          for (iX = 0; iX < m_xmax; iX++)
-          {
-              // sample the values
-              velx = vx->value(iX, iY, iZ);
-              vely = vy->value(iX, iY, iZ);
-              velz = vz->value(iX, iY, iZ);
-              // store each value
-              velocitiesx.push_back(velx);
-              velocitiesy.push_back(vely);
-              velocitiesz.push_back(velz);
-          }
-      }
+        for (iY = 0; iY < xMaxres.y; iY++)
+        {
+            for (iX = 0; iX < xMaxres.x; iX++)
+            {
+                // sample the values
+                velx = vx->value(iX, iY, iZ);
+                vely = vy->value(iX, iY, iZ);
+                velz = vz->value(iX, iY, iZ);
+
+                velocitiesx.push_back(velx);
+                velocitiesy.push_back(vely);
+                velocitiesz.push_back(velz);
+            }
+        }
     }
 
     // find the max value in each axis, and store it in member data
@@ -797,8 +866,8 @@ typename Field<T>::Ptr getField(Field3DInputFile &file, vector<string> &partitio
                 }
             }
 
-        } // layers
-    } // partitions
+        } 
+    } 
     return NULL;
 }
 
@@ -836,8 +905,8 @@ typename Field<FIELD3D_VEC3_T<T> >::Ptr getVectorField(Field3DInputFile &file, v
                 }
             }
 
-        } // layers
-    } // partitions
+        } 
+    } 
     return NULL;
 }
 
@@ -876,15 +945,14 @@ FIELDCREATE
 {
     float blur = 1;
     float bbox_mod = 1;
+    float blur_cubic = 0;
+    float field_cubic = 0;
     if(nfloat > 0) blur = float0[0];
     if(nfloat > 1) bbox_mod = float0[1];
+    if(nfloat > 2) blur_cubic = float0[2];
+    if(nfloat > 3) field_cubic = float0[3];
 	if(nstring > 0)
-		return new F3DImplicitField(string[0], blur, bbox_mod);
+		return new F3DImplicitField(string[0], blur, bbox_mod, blur_cubic, field_cubic);
 	else
 		return 0;
 }
-
-
-
-
-

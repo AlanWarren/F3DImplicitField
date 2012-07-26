@@ -17,6 +17,9 @@
 #include <Field3D/InitIO.h>
 #include <Field3D/Field3DFile.h>
 
+#include "rx.h"
+#include "RixInterfaces.h"
+
 using namespace std;
 using namespace Field3D;
 
@@ -25,7 +28,7 @@ bool matchString(const string&, const vector<string>&);
 template <typename T>
 void ReadLayersAndSetupBounds(typename Field<T>::Vec, V3d&, V3d&, FieldMapping*);
 
-V3d xformPoint(V3d&, FieldMapping*, int);
+V3d xformPoint(V3d&, FieldMapping*);
 
 int main(int argc, char **argv)
 {
@@ -35,37 +38,37 @@ int main(int argc, char **argv)
 
     Field3D::initIO();
 
-    // Process command line ---
-    if (argc < 2) {
-      cout << "Usage: read <file> [name]" << endl;
-      return 1;
-    }
+	RixContext *rixCtx = RxGetRixContext();
+	RixMessages *msgs = (RixMessages*)rixCtx->GetRixInterface(k_RixMessages);
 
     string filename;
-    float blur, bbox_mod, threshold;
+    float blur, bbox_mod, threshold, blur_cubic, field_cubic;
     int doblur = 0;
     float shutter_open = 0;
     float shutter_close = 1;
     int blur_distance = 2;
 
-    if (argc == 9) {
+    if (argc == 11) {
       filename = string(argv[1]);
       blur = atof(argv[2]);
       bbox_mod = atof(argv[3]);
-      threshold = atof(argv[4]);
-      doblur  = atoi(argv[5]);
-      shutter_open = atof(argv[6]);
-      shutter_close = atof(argv[7]);
-      blur_distance = atoi(argv[8]);
+      blur_cubic = atof(argv[4]);
+      field_cubic = atof(argv[5]);
+      threshold = atof(argv[6]);
+      doblur  = atoi(argv[7]);
+      shutter_open = atof(argv[8]);
+      shutter_close = atof(argv[9]);
+      blur_distance = atoi(argv[10]);
     } else {
-        cout << "Not enough arguments specified" << endl;
-        cout << "f3d2prman filename blur bbox_mod threshold doblur blur_distance" << endl;
+        msgs->Error("Not enough arguments specified");
+        msgs->Info("Usage: f3d2prman filename blur bbox_mod blur_cubic field_cubic threshold doblur shutter_open shutter_close blur_distance");
+        return 1;
     }
 
     Field3DInputFile in;
 
     if (!in.open(filename)) {
-        cout << "Aborting because of errors" << endl;
+        msgs->Error("Couldn't open %s", filename.c_str());
         return 1;
     }
     // Prepare for field processing ---
@@ -148,7 +151,7 @@ int main(int argc, char **argv)
              << minBound.z << " " 
              << maxBound.z << "]"
              << "[2 2 2] \"constant float[2] blobbydso:floatargs\" [" 
-             << blur << " " << bbox_mod << "]" 
+             << blur << " " << bbox_mod << " " << blur_cubic << " " << field_cubic << "]" 
              << "  \"constant string[1] blobbydso:stringargs\" [ \"" 
              << filename << "\" ]"
              << " \"constant float blobbydso:threshold\" ["
@@ -172,7 +175,7 @@ int main(int argc, char **argv)
                  << minBound.z - blur_distance << " " 
                  << maxBound.z + blur_distance << "]"
                  << "[2 2 2] \"constant float[2] blobbydso:floatargs\" [" 
-                 << blur << " " << bbox_mod << "]" 
+                 << blur << " " << bbox_mod << " " << blur_cubic << " " << field_cubic << "]" 
                  << "  \"constant string[1] blobbydso:stringargs\" [ \"" 
                  << filename << "\" ]"
                  << " \"constant float blobbydso:threshold\" ["
@@ -237,26 +240,20 @@ void ReadLayersAndSetupBounds(typename Field<T>::Vec sFields,
 
         // derive object-space bounds from extents
         V3d big((V3d)maxres + V3d(1));
-        maxBound = xformPoint(big, mapping, 0);
+        maxBound = xformPoint(big, mapping);
 
         V3d small((V3d)minres + V3d(1));
-        minBound = xformPoint(small, mapping, 0);
+        minBound = xformPoint(small, mapping);
 
     }
 }
 
-V3d xformPoint(V3d &Pt, FieldMapping *mapping, int frustrum)
+V3d xformPoint(V3d &Pt, FieldMapping *mapping)
 {
     M44d vTw;
-    if (frustrum != 0) {
-        Field3D::FrustumFieldMapping::Ptr fmapping =
-            boost::dynamic_pointer_cast<FrustumFieldMapping>(mapping);
-        vTw = fmapping->cameraToWorld();
-    } else {
-        MatrixFieldMapping::Ptr xmapping = 
-            boost::dynamic_pointer_cast<MatrixFieldMapping>(mapping);
-        vTw = xmapping->voxelToWorld();
-    }
+    MatrixFieldMapping::Ptr xmapping = 
+        boost::dynamic_pointer_cast<MatrixFieldMapping>(mapping);
+    vTw = xmapping->voxelToWorld();
 
     M44d big;
     big.setTranslation(Pt);
@@ -266,4 +263,5 @@ V3d xformPoint(V3d &Pt, FieldMapping *mapping, int frustrum)
 
     return ret;
 }
+
 
