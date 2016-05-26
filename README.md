@@ -28,3 +28,10 @@ I compiled HDF5 with +static-libs and -fortran -cxx.
 For openmpi, I used the default config, except for +romio and +cxx. 
 Boost was compiled with +static-libs +mpi 
 ilmbase was also compiled with +static-libs
+
+Build
+----
+
+I'm not providing a makefile, but this should build and link.
+g++ -fPIC -I$RMANTREE/include -c
+g++ F3DImplicitField.o -lField3D -L$RMANTREE/lib -lprman -shared -o F3DImplicitField.so
