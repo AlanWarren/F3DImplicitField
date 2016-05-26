@@ -17,7 +17,7 @@ It's been a good little while since I wrote this (2012), so please excuse any mi
 
 3. http://www.alan-warren.com/2012/08/30/586/ 
 
-This has only been built and tested on LINUX. If you're trying to build it on another platform, good luck! 
+This has only been built and tested on LINUX using prman 17+18. If you're trying to build it on another platform, or with another version of prman good luck!
 
 Requirements
 ------------
