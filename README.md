@@ -22,9 +22,10 @@ This has only been built and tested on LINUX using prman 17+18. If you're trying
 Requirements
 ------------
 
-Field3D 
-Boost
-Pixar's Renderman Pro Server
+* Field3D
+* OpenEXR (ilmbase)
+* Boost
+* Pixar's Renderman Pro Server
 
 Few compilation notes: 
 I compiled HDF5 with +static-libs and -fortran -cxx.  
