@@ -42,6 +42,7 @@ int main(int argc, char **argv)
 	RixMessages *msgs = (RixMessages*)rixCtx->GetRixInterface(k_RixMessages);
 
     string filename;
+    string mainfield;
     float blur, bbox_mod, threshold, blur_cubic, field_cubic;
     int doblur = 0;
     float shutter_open = 0;
@@ -50,18 +51,19 @@ int main(int argc, char **argv)
 
     if (argc == 11) {
       filename = string(argv[1]);
-      blur = atof(argv[2]);
-      bbox_mod = atof(argv[3]);
-      blur_cubic = atof(argv[4]);
-      field_cubic = atof(argv[5]);
-      threshold = atof(argv[6]);
-      doblur  = atoi(argv[7]);
-      shutter_open = atof(argv[8]);
-      shutter_close = atof(argv[9]);
-      blur_distance = atoi(argv[10]);
+      mainfield = string(argv[2]);
+      blur = atof(argv[3]);
+      bbox_mod = atof(argv[4]);
+      blur_cubic = atof(argv[5]);
+      field_cubic = atof(argv[6]);
+      threshold = atof(argv[7]);
+      doblur  = atoi(argv[8]);
+      shutter_open = atof(argv[9]);
+      shutter_close = atof(argv[10]);
+      blur_distance = atoi(argv[11]);
     } else {
         msgs->Error("Not enough arguments specified");
-        msgs->Info("Usage: f3d2prman filename blur bbox_mod blur_cubic field_cubic threshold doblur shutter_open shutter_close blur_distance");
+        msgs->Info("Usage: f3d2prman filename fieldname blur bbox_mod blur_cubic field_cubic threshold doblur shutter_open shutter_close blur_distance");
         return 1;
     }
 
@@ -72,7 +74,6 @@ int main(int argc, char **argv)
         return 1;
     }
     // Prepare for field processing ---
-    const string fieldtype = "density";
     vector<string> fieldName;
     vector<string> attribName;
     vector<string> layers;
@@ -89,9 +90,14 @@ int main(int argc, char **argv)
 
         sscanf(buf, "%f %d", &detail, &Mode);
         // loop over layers and partitions to access density
-        in.getPartitionNames(partitions);
         const string dstr = "density";
-        fieldName.push_back(dstr);
+        in.getPartitionNames(partitions);
+
+        if (!mainfield.empty()) {
+            fieldName.push_back(mainfield);
+        } else {
+            fieldName.push_back(dstr);
+        }
         
         BOOST_FOREACH (const string &part, partitions) {
             vertexFields.push_back(part);
@@ -150,10 +156,10 @@ int main(int argc, char **argv)
              << maxBound.y << " " 
              << minBound.z << " " 
              << maxBound.z << "]"
-             << "[2 2 2] \"constant float[2] blobbydso:floatargs\" [" 
+             << "[2 2 2] \"constant float[4] blobbydso:floatargs\" [" 
              << blur << " " << bbox_mod << " " << blur_cubic << " " << field_cubic << "]" 
              << "  \"constant string[1] blobbydso:stringargs\" [ \"" 
-             << filename << "\" ]"
+             << filename << "\" \"" << mainfield <<  "\" ]"
              << " \"constant float blobbydso:threshold\" ["
              << threshold << "] ";
 
@@ -174,10 +180,10 @@ int main(int argc, char **argv)
                  << maxBound.y + blur_distance << " " 
                  << minBound.z - blur_distance << " " 
                  << maxBound.z + blur_distance << "]"
-                 << "[2 2 2] \"constant float[2] blobbydso:floatargs\" [" 
+                 << "[2 2 2] \"constant float[4] blobbydso:floatargs\" [" 
                  << blur << " " << bbox_mod << " " << blur_cubic << " " << field_cubic << "]" 
                  << "  \"constant string[1] blobbydso:stringargs\" [ \"" 
-                 << filename << "\" ]"
+                 << filename << "\" \"" << mainfield <<  "\" ]"
                  << " \"constant float blobbydso:threshold\" ["
                  << threshold << "] ";
 
@@ -263,5 +269,7 @@ V3d xformPoint(V3d &Pt, FieldMapping *mapping)
 
     return ret;
 }
+
+
 
 
