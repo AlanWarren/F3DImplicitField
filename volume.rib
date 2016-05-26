@@ -1,0 +1,105 @@
+##RIB
+version 3.03
+# Houdini Version: 12.0.652
+# Generation Time: Jun 14, 2012 at 21:07:51
+#   Backend: soho
+#     Render Defs: /home/alan/houdini12.0/soho/RIBprman16.0.py
+#        HIP File: /home/alan/job/volumes/soho_attributes_setup.hip, $T=1.08333, $FPS=24
+#   Output driver: /out/volume
+# Main image
+# RIB Hook - Render at time: 1.08333 [<soho.SohoObject instance at 0x7fc1cc67fab8>]
+Option "searchpath" "string shader" ["/opt/pixar/RenderManProServer-18.0b1/lib/shaders:/home/alan/rsl/rel:/opt/hfs/houdini/ri_shaders"]
+Option "limits" "int radiositycachememory" [204800]
+Option "limits" "color othreshold" [0.995999992 0.995999992 0.995999992]
+Option "limits" "color zthreshold" [0.995999992 0.995999992 0.995999992]
+Option "shadow" "float bias" [0.224999994]
+FrameBegin 27	# {
+    # main camera: /obj/cam1
+    Display "volume" "it" "rgba" "int houdiniportnum" [23244]
+    PixelFilter "separable-catmull-rom" 3 3
+    Quantize "rgba" 255 0 255 0.5
+#DisplayChannel "varying color o_temperature" "string filter" ["catmull-rom"] "float[2] filterwidth" [3 3]
+#Display "+temperature" "it" "o_temperature" "string filter" ["catmull-rom"] "float[2] filterwidth" [3 3]
+#DisplayChannel "varying color o_fuel" "string filter" ["catmull-rom"] "float[2] filterwidth" [3 3]
+#Display "+fuel" "it" "o_fuel" "string filter" ["catmull-rom"] "float[2] filterwidth" [3 3]
+#DisplayChannel "varying color o_heat" "string filter" ["catmull-rom"] "float[2] filterwidth" [3 3]
+#Display "+heat" "it" "o_heat" "string filter" ["catmull-rom"] "float[2] filterwidth" [3 3]
+#DisplayChannel "varying color o_burn" "string filter" ["catmull-rom"] "float[2] filterwidth" [3 3]
+#Display "+burn" "it" "o_burn" "string filter" ["catmull-rom"] "float[2] filterwidth" [3 3]
+#Hider "hidden" "int jitter" [1] "int sigma" [0] "float sigmablur" [1]
+#Hider "hidden"  "float[2] shutteropening" [0 1]
+Hider "hidden" 
+    Format 640 480 1
+    Clipping 0.10000000149 4517.93340812
+    PixelSamples 9 9
+    Shutter 0 1
+#Shutter 0 0
+    Projection "perspective"  "float fov" [65]
+    ScreenWindow [-1 1 -0.75 0.75]
+	    MotionBegin [0 1]	# {
+        Transform [0.669015502903 -0.0660794096729 -0.740305186051 0 2.98023251216e-08 0.996040003666 -0.0889061926822 0 -0.743248448956 -0.0594795991456 -0.666366205933 0 0.0745895158115 -5.48202123864 19.0353372526 1]
+        Transform [0.669015502903 -0.0660794096729 -0.740305186051 0 2.98023251216e-08 0.996040003666 -0.0889061926822 0 -0.743248448956 -0.0594795991456 -0.666366205933 0 0.0745895158115 -5.48202123864 19.0353372526 1]
+    MotionEnd
+#Imager "rps_bg"
+    Camera "world" "float[2] shutteropening" [0 1]
+    WorldBegin	# {
+	TransformBegin	# {
+	    CoordinateSystem "worldspace"
+	TransformEnd	# }
+	# Light Source /obj/spotlight1
+	    MotionBegin [0 1]	# {
+	Transform [0.668885956444 7.86140856342e-08 -0.743365036353 0 -0.592841973876 0.603304140492 -0.533444006505 0 -0.448475162393 -0.797511199962 -0.403541713645 0 11.8670253754 21.1028060913 10.6780443192 1]
+	Transform [0.668885956444 7.86140856342e-08 -0.743365036353 0 -0.592841973876 0.603304140492 -0.533444006505 0 -0.448475162393 -0.797511199962 -0.403541713645 0 11.8670253754 21.1028060913 10.6780443192 1]
+    MotionEnd
+
+	Attribute "identifier" "string name" ["/obj/spotlight1"]
+    LightSource "aw_spotlight" "/obj/spotlight1"  "uniform float intensity" [6] "color lightcolor" [1 1 1] "uniform float doTransmission" [0] "varying color _shadow" [0 0 0] "varying color _cl_noshadow" [0 0 0] "varying float _atten" [0]
+#LightSource "plausibleArealight" "/obj/spotlight1"  "uniform float intensity" [145] "uniform color lightcolor" [1 1 1] 
+Identity
+	AttributeBegin	# {
+	    # Geometry object /obj/volume
+	    MotionBegin [0 1]	# {
+            Transform [1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1]
+            Transform [1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1]
+        MotionEnd   # }
+	    Attribute "identifier" "string name" ["/obj/volume"]
+        ShadingInterpolation "smooth"
+	    ShadingRate 1
+#Attribute "dice" "string referencecamera" ["worldcamera"]
+        #Attribute "dice" "float minlength" [0.0001] "string minlengthspace" ["world"]        
+        Attribute "dice" "rasterorient" [0]
+
+        #GeometricApproximation "motionfactor" 3
+        #GeometricApproximation "focusfactor" 3
+
+        Attribute "trace" "int maxdiffusedepth" [1]
+        Attribute "trace" "int maxspeculardepth" [1]
+        Attribute "trace" "int samplemotion" [1] 
+        Attribute "trace" "float bias" [0.00999999978]
+        #Attribute "volume" "float depthrelativeshadingrate" [1] "string depthinterpolation" ["constant"]
+        #Attribute "stochastic" "int sigma" [1]
+        Attribute "volume" "string depthinterpolation" ["smooth"]
+        Attribute "volume" "string[1] refinementstrategies" ["uniformdepth"]
+        Attribute "volume" "float[2] depthrelativeshadingrate" [2 2]
+        Attribute "volume" "deptherror" [0.00392]
+
+        Attribute "shade" "string transmissionhitmode" ["shader"]
+        Attribute "shade" "string diffusehitmode" ["shader"]
+
+	    Attribute "visibility" "int diffuse" [1]
+	    Attribute "visibility" "int specular" [1]
+	    Attribute "visibility" "int transmission" [1]
+#Surface "vol_density" "uniform float samples" [4] "uniform float bias" [0.1]
+Surface "volumefire"
+#Surface "cloud_simplelight"  "float noisefreq" [1]
+        #Surface "plausibleVolume" "varying float density" [1]
+	    Sides 2
+	    MotionBegin [0 1]	# {
+#"varying vector dPdtime" [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0] 
+	    Volume "blobbydso:/home/alan/dev/renderman/f3d2prman/sample_code/git/F3DImplicitField.so" [-3.599 3.5550 -1.550 5.550 -3.599 3.500]  [2 2 2] "constant float[2] blobbydso:floatargs" [0.3 1] "constant string[1] blobbydso:stringargs" [ "/home/alan/dev/renderman/f3d2prman/sample_code/dev/flames.f3d" ] "constant float blobbydso:threshold" [0.00001] "varying float fuel" [0 0 0 0 0 0 0 0] "varying float temperature" [0 0 0 0 0 0 0 0] "varying float heat" [0 0 0 0 0 0 0 0] 
+
+	    Volume "blobbydso:/home/alan/dev/renderman/f3d2prman/sample_code/git/F3DImplicitField.so" [3 25.079146 4.991816 30.94443 3.897288 25.509365]  [2 2 2] "constant float[2] blobbydso:floatargs" [0.3 1] "constant string[1] blobbydso:stringargs" [ "/home/alan/dev/renderman/f3d2prman/sample_code/dev/flames.f3d" ] "constant float blobbydso:threshold" [0.00001] "varying float fuel" [0 0 0 0 0 0 0 0] "varying float temperature" [0 0 0 0 0 0 0 0] "varying float heat" [0 0 0 0 0 0 0 0] 
+        MotionEnd   # }
+	AttributeEnd	# }
+    WorldEnd	# }
+FrameEnd	# }
