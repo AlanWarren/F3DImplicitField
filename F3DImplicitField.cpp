@@ -89,7 +89,7 @@ RtFloat VertexField<T>::EvalField(const RtPoint p)
 class F3DImplicitField : public ImplicitField
 {
     public:
-    	F3DImplicitField(string path, float blur, float bbox_mod, float blur_cubic, float field_cubic);
+    	F3DImplicitField(string path, string field, float blur, float bbox_mod, float blur_cubic, float field_cubic);
     	~F3DImplicitField(){}
     
     	virtual RtFloat Eval(const RtPoint p);
@@ -182,7 +182,7 @@ class F3DImplicitField : public ImplicitField
         double m_vel_length;
 };
 
-F3DImplicitField::F3DImplicitField(string path, float blur, float bbox_mod, float blur_cubic, float field_cubic) : 
+F3DImplicitField::F3DImplicitField(string path, string field, float blur, float bbox_mod, float blur_cubic, float field_cubic) : 
     m_blur(blur), m_bbox_mod(bbox_mod), m_blur_cubic(blur_cubic), m_field_cubic(field_cubic)
 {
 	RixContext *rixCtx = RxGetRixContext();
@@ -211,7 +211,12 @@ F3DImplicitField::F3DImplicitField(string path, float blur, float bbox_mod, floa
     // loop over layers and partitions to access density
     m_in.getPartitionNames(m_partitions);
     const string dstr = "density";
-    m_fieldName.push_back(dstr);
+
+    if (!field.empty()) {
+        m_fieldName.push_back(field);
+    } else {
+        m_fieldName.push_back(dstr);
+    }
 
     // loop over once to gather all field names
     BOOST_FOREACH (const string &part, m_partitions) {
@@ -399,6 +404,7 @@ void F3DImplicitField::Motion(RtPoint result, const RtPoint p)
             }
 
         } else {
+
             if (m_blur_cubic != 0) {
                 v_samps.x = m_cubicfinterpolator.sample(*m_velx_fbuffer, vsPx);
                 v_samps.y = m_cubicfinterpolator.sample(*m_vely_fbuffer, vsPy);
@@ -477,9 +483,14 @@ void F3DImplicitField::Motion(RtPoint result, const RtPoint p)
         ret.z = static_cast<float>(v_samps.z);
     }
 
+	ret.x /= 24.0/0.3;
+	ret.y /= 24.0/0.3;
+	ret.z /= 24.0/0.3;
+
     result[0] = ret.x * m_blur;
     result[1] = ret.y * m_blur;
     result[2] = ret.z * m_blur;
+
 }
 
 void F3DImplicitField::BoxMotion(RtBound result, const RtBound b)
@@ -494,14 +505,14 @@ void F3DImplicitField::BoxMotion(RtBound result, const RtBound b)
     V3d diffmin(m_vel_xmin - bbox[0], m_vel_ymin - bbox[2], m_vel_zmin - bbox[4]);
 
     // Offset by length seems to work the best..
-    result[0] = b[0] + (maxlenf * m_bbox_mod);
+    result[0] = b[0] - (maxlenf * m_bbox_mod);
     result[1] = b[1] + (maxlenf * m_bbox_mod);
-    result[2] = b[2] + (maxlenf * m_bbox_mod);
+    result[2] = b[2] - (maxlenf * m_bbox_mod);
     result[3] = b[3] + (maxlenf * m_bbox_mod);
-    result[4] = b[4] + (maxlenf * m_bbox_mod);
+    result[4] = b[4] - (maxlenf * m_bbox_mod);
     result[5] = b[5] + (maxlenf * m_bbox_mod);
     
-    msgs->Info("Motion Bounds (%f %f %f %f %f %f)", result[0], result[1], result[2], result[3], result[4], result[5]);
+    //msgs->Info("Motion Bounds (%f %f %f %f %f %f)", result[0], result[1], result[2], result[3], result[4], result[5]);
 }
 
 void F3DImplicitField::MotionMultiple(int neval, RtPoint *result, const RtPoint *p) 
@@ -544,7 +555,6 @@ VertexField<T>* F3DImplicitField::NamedVertexField(const RtToken &pname, int &nv
             if (nvalue == 1 && !strcmp(pname, cmp.c_str())) {
                 return new VertexField<T>(m_in, m_mapping, interp, m_partitions, Mp, nm);
             } 
-            // TODO: Add support for vector VertexField<T>*
         }
     }
     return NULL;
@@ -699,6 +709,9 @@ bool matchString(const string &str, const vector<string> &patterns)
   return false;
 }
 
+/* returns the vector velocity buffer and sets member
+ * data for min / max velocities sampled from buffer,
+ * as well as the max length of said values */
 template <typename T>
 typename Field<FIELD3D_VEC3_T<T> >::Ptr 
 F3DImplicitField::SetupVectorVelocityFields(vector<string> &velFieldNames,
@@ -871,6 +884,7 @@ typename Field<T>::Ptr getField(Field3DInputFile &file, vector<string> &partitio
     return NULL;
 }
 
+/* returns a pointer to a velocity buffer (XYZ) */
 template <typename T>
 typename Field<FIELD3D_VEC3_T<T> >::Ptr getVectorField(Field3DInputFile &file, vector<string> &partitionsVec, vector<string> &fieldName,
         vector<string> &attribName, vector<string> &vectorLayers, const string &attrib, const string &name)
@@ -952,7 +966,8 @@ FIELDCREATE
     if(nfloat > 2) blur_cubic = float0[2];
     if(nfloat > 3) field_cubic = float0[3];
 	if(nstring > 0)
-		return new F3DImplicitField(string[0], blur, bbox_mod, blur_cubic, field_cubic);
+		return new F3DImplicitField(string[0], string[1], blur, bbox_mod, blur_cubic, field_cubic);
 	else
 		return 0;
 }
+

@@ -49,7 +49,7 @@ int main(int argc, char **argv)
     float shutter_close = 1;
     int blur_distance = 2;
 
-    if (argc == 11) {
+    if (argc == 12) {
       filename = string(argv[1]);
       mainfield = string(argv[2]);
       blur = atof(argv[3]);
@@ -158,7 +158,7 @@ int main(int argc, char **argv)
              << maxBound.z << "]"
              << "[2 2 2] \"constant float[4] blobbydso:floatargs\" [" 
              << blur << " " << bbox_mod << " " << blur_cubic << " " << field_cubic << "]" 
-             << "  \"constant string[1] blobbydso:stringargs\" [ \"" 
+             << "  \"constant string[2] blobbydso:stringargs\" [ \"" 
              << filename << "\" \"" << mainfield <<  "\" ]"
              << " \"constant float blobbydso:threshold\" ["
              << threshold << "] ";
@@ -182,7 +182,7 @@ int main(int argc, char **argv)
                  << maxBound.z + blur_distance << "]"
                  << "[2 2 2] \"constant float[4] blobbydso:floatargs\" [" 
                  << blur << " " << bbox_mod << " " << blur_cubic << " " << field_cubic << "]" 
-                 << "  \"constant string[1] blobbydso:stringargs\" [ \"" 
+                 << "  \"constant string[2] blobbydso:stringargs\" [ \"" 
                  << filename << "\" \"" << mainfield <<  "\" ]"
                  << " \"constant float blobbydso:threshold\" ["
                  << threshold << "] ";
