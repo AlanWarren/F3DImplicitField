@@ -10,8 +10,11 @@ Notes
 -----
 
 It's been a good little while since I wrote this (2012), so please excuse any missing information. I did blog about the project when it was originally developed.
+
 1. http://www.alan-warren.com/2012/07/26/539/ 
+
 2. http://www.alan-warren.com/2012/08/15/580/  
+
 3. http://www.alan-warren.com/2012/08/30/586/ 
 
 This has only been built and tested on LINUX. If you're trying to build it on another platform, good luck! 
