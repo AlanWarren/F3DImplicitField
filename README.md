@@ -1,10 +1,10 @@
 Field3d Implicit Field plugin for Pixar's Renderman
 ==========================================================
 
-F3DImplicitField is the DSO
+F3DImplicitField.cpp is the Implicit Field DSO.
 
-f3d2prman is a runprogram that facilitates the use of F3DImplicitField. 
-You will use it to generate the RIB that calls our DSO. 
+f3d2prman.cpp is a runprogram that facilitates the use of F3DImplicitField. 
+You will use it to generate the RIB that calls our DSO.
 
 Notes
 -----
