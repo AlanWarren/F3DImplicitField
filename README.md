@@ -19,6 +19,9 @@ It's been a good little while since I wrote this (2012), so please excuse any mi
 
 This has only been built and tested on LINUX using prman 17+18 with Houdini. If you're trying to build it on another platform, or with another version of prman good luck!
 
+I haven't touched this code since 2012, and have no plans to maintain it with current versions of prman or field3d. This was a learning project for me, and the
+main reason I'm putting on github, is to hopefully help somebody else who's looking to learn from it. Feel free to contact me if you have any questions. 
+
 Requirements
 ------------
 
