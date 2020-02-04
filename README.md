@@ -11,11 +11,12 @@ Notes
 
 It's been a good little while since I wrote this (2012), so please excuse any missing information. I did blog about the project when it was originally developed.
 
-1. http://www.alan-warren.com/2012/07/26/539/ 
+(archived to markdown since my site is no longer around)
+1. [Rendering Volumes 1](Rendering_Volumes1.md)
 
-2. http://www.alan-warren.com/2012/08/15/580/  
+2. [Rendering Volumes 2](Rendering_Volumes2.md)
 
-3. http://www.alan-warren.com/2012/08/30/586/ 
+3. [Rendering Volumes 3](Rendering_Volumes3.md)
 
 This has only been built and tested on LINUX using prman 17+18 with Houdini. If you're trying to build it on another platform, or with another version of prman good luck!
 
