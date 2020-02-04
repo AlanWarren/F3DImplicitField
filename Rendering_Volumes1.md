@@ -1,7 +1,7 @@
-#Rendering Volumes from Houdini in Pixar's RenderMan – Part 1
+# Rendering Volumes from Houdini in Pixar's RenderMan – Part 1
 I've recently built a set of tools that allow rendering Houdini's volumes as true volume primitives in prman using an ImplicitField DSO.
 
-##About the tools
+## About the tools
 * F3DImplicitField is an ImplicitField DSO which uses Sony's Field3D C++ API along with prman's SDK to render "level set" surfaces.
 * f3d2prman is a C++ procedural runprogram that outputs RIB necessary for rendering an RiVolume primitive. This is employed as a Geometry SHOP HDA in Houdini.
 * HDA UI
@@ -9,7 +9,7 @@ I've recently built a set of tools that allow rendering Houdini's volumes as tru
 
 Side Effects provides a Field3D plugin with Houdini's HDK, which is necessary to both import and export volumes as Field3D voxel grids.
 
-##Features
+## Features
 * Both Sparse and Dense Fields are supported.
 * For now, I assume density and all additional fields like temperature, heat, etc. are scalar.
 * Velocity fields can be either vector or scalar.
@@ -20,13 +20,16 @@ Side Effects provides a Field3D plugin with Houdini's HDK, which is necessary to
 Here's an example render. There will definitely be more to come, including a more thorough overview showing some motion blur with animation.
 ![smoke test #1](https://raw.githubusercontent.com/AlanWarren/F3DImplicitField/master/images/smokey.jpg)
 
-###Comparison between Mantra and PRman.
-Mantra
+## Comparison between Mantra and PRman.
+    Mantra
+
 ![mantra](images/mantra_smoke.jpg)
-PRman
+
+    PRman
+
 ![prman](images/prman_smoke.jpg)
 
-##Sources
+## Sources
 * The guys at Sony have done a great job providing documentation and valuable examples bundled with the Field3D library. The SIGGRAPH 2011 class on Production Volume Rendering also provides almost 300 pages of volume rendering material. This is going to be released as a book Sept. 28th 2012.
 
 * Besides documentation directly related to Field3D, I also found helpful information from Physically Based Rendering, and Graphics Gems IV and V.
